@@ -1,0 +1,103 @@
+---
+title: "Eddie Module on Nutrient Loading"
+output: html_notebook
+---
+
+Note this is essentially the same thing as the water quality module and I think there is an issue with the set up as it is not correct
+
+
+# Install the basic libraries
+```{r install libraries}
+# install.packages("tidyverse")
+# install.packages("readxl")
+# install.packages("janitor")
+# install.packages("lubridate")
+# install.packages("broom")
+# install.packages("patchwork")
+# install.packages("skimr")
+```
+
+# Load libraries    
+Load the libraries each time you run a script or program   
+```{r load libraries, message=FALSE, warning=FALSE}
+library(tidyverse) # loads a lot of libraries in this one to add more functionality
+library(readxl) # allows you to read in excel files
+library(janitor) # cleans up column names and removes empty columns if wanted
+library(lubridate) # allows easy conversion of varaibles to date format
+library(broom) # cleans up output for easy presentation
+library(patchwork)
+library(skimr)
+```
+
+           
+# Read in files
+Decar River in Palo Iowa 15 mintue data
+```{r}
+decar.df <- read_excel("../data/nutrient_loading_module_data.xlsx",
+                    sheet = "decar_river_palo_iowa")
+```
+
+
+# Recalculate columns for reproducibility
+The conversion of cubic feet per second to liters required CFS to be multiplied by 28.136
+```{r}
+decar.df <- decar.df %>% 
+  mutate(time_int_load_kgn = discharge_cfs * nitrate_n_mgl * 28.136 * 15 * (60/1000000),
+         time_int__q_l = discharge_cfs *28.136*15*60)
+```
+
+
+# Plot of nitrate versus time
+```{r}
+decar.df %>% 
+  ggplot(aes(x=datetime, y =nitrate_n_mgl)) +
+  geom_line() +
+  geom_point()
+```
+
+```{r}
+decar.df %>% 
+  ggplot(aes(x=datetime, y =discharge_cfs)) +
+  geom_line() +
+  geom_point()
+```
+
+# Statistics of nitrate data
+```{r}
+skim(decar.df$ nitrate_n_mgl)
+```
+
+Add a new column to the right of the concentration data called “Rank” (R).  In this column, the highest concentration value has a rank equal to 1, the next highest concentration has a rank of 2, and so forth for the entire dataset.  There should be 13,897 data points in this dataset.  This means the total number (n) of this dataset is 13,897.       
+    
+Add a third column to the right called Probability (p).  This will be the likelihood that a concentration of a given Rank (R) will occur within the dataset.  Calculate the probability by dividing the rank by the total number (n) plus one.  Type this equation in a new column and fill it down for the entire dataset.  p=R/(n+1)      
+      
+Finally, calculate a fourth column showing the Percent Probability (%), by multiplying the probability number by 100.  This is the probability that a given concentration occurred during any 15 second period between April and September, 2014.       
+
+
+# Create a probability dataset
+This will create a probability column in a new dataset called pr
+```{r}
+prob.df <- decar.df %>% 
+  filter(!is.na(nitrate_n_mgl)) %>% 
+  arrange(desc(nitrate_n_mgl)) %>% 
+  mutate(rank  = 1:n()) %>% 
+  mutate(prob = rank / (n()+1)) %>%
+  mutate(pct_prob = prob * 100)
+```
+
+
+```{r}
+prob.df %>% 
+  ggplot(aes(x=pct_prob, y = nitrate_n_mgl)) +
+  geom_point() +
+  geom_hline(yintercept = 10, color="red", size = 2, alpha = .5) +
+  annotate(geom="text",
+                x=25,
+                y=10.5,
+                label="EPA Drinking Water Limit",
+                fontface="bold")
+```
+
+
+
+
